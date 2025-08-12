@@ -1,261 +1,101 @@
 <?php
-$today = date("Y-m-d");
-include "db2.php";
-$expense = false;
-$income = false;
-session_start();
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] != true) {
-    header("location: login.php");
-    exit;
-}
-
-// $balance = 0;
-
-$user_id = 1;
-$book_id = 1;
-// $user_id = $_POST['user_id']?: 1;
-// $book_id = $_POST['book_id']?: 1;
+$alert=false;
+include "db.php";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $category_name = $_POST['category_name'] ?? '';
-    $date = $_POST['date'] ?? $today; // backdated or today
-    $description = $_POST['description'] ?? '';
-    $amount = $_POST['amount'] ?? 0;
-    // $expense = $_POST['expense'] ?: 0;
-}
 
+    $email = $_POST["email"];
+    $password = $_POST["password"];
+    $sql_users = "Select * from users where email='$email' AND password='$password'";
+    $result_users = mysqli_query($conn, $sql_users);
 
+    // $num_users = mysqli_num_rows($result_users);
+    if (mysqli_num_rows($result_users) == 1) {
+        session_start();
+        $user_data = mysqli_fetch_assoc($result_users); // fetch the matched user row
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['income'])) {
-    $income = true;
-    $expense = false;
-}
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['expense'])) {
-    $income = false;
-    $expense = true;
-}
-
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['savein'])) {
-
-    // ✅ Insert the new entry FIRST (only once)
-    $sql = "INSERT INTO `expenses` 
-            (`user_id`, `book_id`, `date`, `description`, `category_name`, `income`, `balance`) 
-            VALUES ('$user_id', '$book_id', '$date', '$description', '$category_name', '$amount', '0')";
-
-    if ($conn->query($sql) === TRUE) {
-        // ✅ Recalculate all balances
-        $balance = 0;
-        $fetch_sql = "SELECT * FROM expenses
-                      WHERE user_id = $user_id AND book_id = $book_id
-                      ORDER BY date, id";
-        $result = $conn->query($fetch_sql);
-
-        while ($row = $result->fetch_assoc()) {
-            $income = floatval($row['income']);
-            $expense = floatval($row['expense']);
-            $balance += $income - $expense;
-
-            $update_sql = "UPDATE expenses 
-                           SET balance = $balance 
-                           WHERE id = " . $row['id'];
-            $conn->query($update_sql);
-        }
-
-        echo "✅ Income entry added and balances updated.";
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-
-    } else {
-        echo "❌ Error inserting: " . $conn->error;
+        $_SESSION['loggedin'] = true;
+        $_SESSION['email'] = $email;
+        $_SESSION['user_id'] = $user_data['user_id'];
+        // echo $user_data['user_id'];
+        header("location: books.php");
+        exit;
+    }else{
+        $alert= "Invalid credintials";
     }
 }
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['saveout'])) {
-
-    // ✅ Insert the new entry FIRST (only once)
-    $sql = "INSERT INTO `expenses` 
-            (`user_id`, `book_id`, `date`, `description`, `category_name`, `expense`, `balance`) 
-            VALUES ('$user_id', '$book_id', '$date', '$description', '$category_name','$amount','0')";
-
-    if ($conn->query($sql) === TRUE) {
-        // ✅ Recalculate all balances
-        $balance = 0;
-        $fetch_sql = "SELECT * FROM expenses
-                      WHERE user_id = $user_id AND book_id = $book_id
-                      ORDER BY date, id";
-        $result = $conn->query($fetch_sql);
-
-        while ($row = $result->fetch_assoc()) {
-            $income = floatval($row['income']);
-            $expense = floatval($row['expense']);
-            $balance += $income - $expense;
-
-            $update_sql = "UPDATE expenses 
-                           SET balance = $balance 
-                           WHERE id = " . $row['id'];
-            $conn->query($update_sql);
-        }
-
-        echo "✅ Expense entry added and balances updated.";
-        ;
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit();
-
-    } else {
-        echo "❌ Error inserting: " . $conn->error;
-    }
-}
-
-
-$sql_category = "SELECT * FROM categories";
-// $sql_category = "SELECT categories FROM categories";
-$result_category = $conn->query($sql_category);
-
-if (isset($_GET['username']) && isset($_GET['cancel'])) {
-    $expense = false;
-    $income = false;
-}
-
-
-
-$sql_data = "SELECT * FROM expenses WHERE user_id = $user_id AND book_id = $book_id ORDER BY date, id";
-$result_data = $conn->query($sql_data);
-
-
-
-
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Expence Tracker</title>
+    <title>Expense Tracker - Login</title>
     <style>
-        body {
-            margin: 0;
-        }
+       
 
-        .text-center {
+        .login {
+            /* padding-top: 10px; */
+            padding:0px 20px 20px 20px;
             text-align: center;
-        }
-
-        .text-size {
-            font-size: 1.25rem;
-        }
-
-        /* .btn-div {
-            width: 350px;
-            margin: 0 auto;
-            display: flex;
-        }
-
-        .in {
-            text-align: left;
-            flex: 1;
-
-        }
-
-        .out {
-            text-align: right;
-            flex: 1;
-        } */
-        .btn-div {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-
-        .form {
-            align-items: center;
-            text-align: center;
-            background-color: rgba(229, 234, 227, 1);
-            width: 600px;
-            margin: 0 auto;
-            border: 2px;
+            border: 2px solid black;
             border-radius: 15px;
-
+            background: #f9f9f9;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
 
-        .marginn {
-            margin: 10px 0 10px 0;
-            font-size: 1.875rem;
+        label {
+            font-size: 20px;
+            display: block;
+            margin-top: 15px;
         }
 
-        .button {
-            background-color: #04AA6D;
-            /* Green */
+        input {
+            width: 90%;
+            padding: 8px;
+            font-size: 18px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 20px;
             border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
             color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 1rem;
-            margin: 4px 2px;
             cursor: pointer;
         }
 
-        .button2 {
-            background-color: #f44336;
+        button:hover {
+            background-color: #45a049;
         }
-
-        .cancel-btn {
-            text-align: right;
-            padding-top: 15px;
-            padding-right: 15px;
-            /* font-size: 20px; */
-        }
-/* 
-        table {
-            width: 90vw;
-            
-            margin: 10px auto 0 auto;
-            border-collapse: collapse;
-            font-size: .8rem;
-        }
-
-        th,
-        td {
-            border: 1px solid #ccc;
-            padding: 10px;
+        .alert-danger{
+            margin:0 auto;
             text-align: center;
+            width:300px;
+            background-color: #f90707ff;
+            color:white;
+            font-size: 20px;
+            padding: 10px;
+            border: 1px;
+            border-radius: 12px;
         }
-
-        th {
-            background-color: #f2f2f2;
-        } */
-.table-container {
-    width: 100%;
-    overflow-x: auto; /* Allows horizontal scroll on small screens */
-}
-
-table {
-    margin: 10px auto 0 auto;
-    width: 80%;
-    border-collapse: collapse;
-    min-width: 100px;
-     /* Prevents table from shrinking too much */
-}
-
-th, td {
-    border: 1px solid #ccc;
-    padding: 8px;
-    text-align: left;
-}
-
-th {
-    /* background-color: #f4f4f4; */
-    background-color: #f2f2f2;
-}
         .navbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: #4DB3B0;
-            margin-bottom:2%;
-            color:white;
+            background-color: #4A90E2;
+            margin-bottom: 2%;
+            color: white;
         }
 
         .navbar-brand {
@@ -268,6 +108,10 @@ th {
             list-style: none;
             padding-right: 1.5%;
             font-size: 1.12rem;
+            display: flex;
+        }
+        .navbar-menu li {
+            margin-right: 20px;
         }
 
         .navbar-menu a:hover {
@@ -280,131 +124,45 @@ th {
         .navbar-menu a {
             text-decoration: none;
             /* color: #333; */
-            color:white;
+            color: white;
             /* padding: 8px; */
             display: block;
+        }
+        body {
+            margin: 0;
         }
     </style>
 </head>
 
 <body>
-    <!-- <h1 class="text-center">Expence Tracker</h1> -->
     <nav>
         <div class="navbar">
             <div class="navbar-brand">Expense-Tracker</div>
             <ul class="navbar-menu">
-                <li><a href="#">Logout</a> </li>
+                <li><a href="register.php">Register</a> </li>
             </ul>
         </div>
     </nav>
-    <form method="POST">
-        <div class="btn-div">
-            <div class="in">
-                <button type="submit" name="income" class="text-size button">Cash In</button>
-            </div>
-            <div class="out">
-                <button type="submit" name="expense" class="text-size button button2">Cash Out</button>
-            </div>
-        </div>
-    </form>
-    <br><br>
-    <?php if ($income) { ?>
-        <div class="form">
-            <form class="cancel-btn">
-                <button type="submit" name="cancel" style="font-size:20px;">Cancel</button>
-            </form>
-            <h3 style="color:#04AA6D;font-size:34px;">Cash In</h3>
+    <?php  
+        if($alert){
+            echo ' <div class="alert-danger">
+            Invalid credintials !
+    </div> ' ;
+        }
+    ?>
+        <div class="login">
+            <h1>Login </h1>
             <form method="POST">
-                <label for="income" class="marginn">Amount :</label>
-                <input type="text" id="income" name="amount" placeholder="Amount" required class="marginn"><br>
-
-                <label for="description" class="marginn">Remark :</label>
-                <input type="text" id="description" name="description" placeholder="Remark" required class="marginn"><br>
-
-                <label for="description" class="marginn">Category :</label>
-                <select name="category_name" class="marginn" required>
-                    <option value="">-- Select category --</option>
-                    <?php while ($rows_category = $result_category->fetch_assoc()) { ?>
-                        <option value="<?= $rows_category['categories'] ?>"> <?= $rows_category['categories'] ?></option>
-                    <?php } ?>
-                </select>
-                <br>
-                <!-- <label for="date">Choose a date:</label> -->
-                <input type="date" name="date" id="date" class="marginn" value="<?php echo $today; ?>"><br>
-
-                <button type="submit" name="savein" class="marginn">Save</button>
-            </form><br>
-        </div>
-    <?php } ?>
-
-    <?php
-    // Re-query categories before second form
-    $result_category = $conn->query($sql_category);
-
-    if ($expense) { ?>
-        <div class="form">
-            <form class="cancel-btn">
-                <button type="submit" name="cancel" style="font-size:20px;">Cancel</button>
+                <label for="email">E-mail :</label>
+                <input type="email" id="email" name="email" placeholder="Enter E-mail" required>
+                
+                <label for="password">Password :</label>
+                <input type="password" id="password" name="password" placeholder="Enter Password" required>
+                
+                <button type="submit">Login</button>
             </form>
-            <h3 style="color:#f44336;font-size:34px;">Cash Out</h3>
-            <form method="POST">
-                <label for="expense" class="marginn">Amount :</label>
-                <input type="text" id="expense" name="amount" placeholder="Amount" required class="marginn"><br>
-
-                <label for="description" class="marginn">Remark :</label>
-                <input type="text" id="description" name="description" placeholder="Remark" required class="marginn"><br>
-
-                <label for="description" class="marginn">Category :</label>
-                <select name="category_name" class="marginn" required>
-                    <option value="">-- Select category --</option>
-                    <?php while ($rows_category = $result_category->fetch_assoc()) { ?>
-                        <option value="<?= $rows_category['categories'] ?>"> <?= $rows_category['categories'] ?></option>
-                    <?php } ?>
-                </select>
-                <br>
-                <!-- <label for="date">Choose a date:</label> -->
-                <input type="date" name="date" id="date" class="marginn" value="<?php echo $today; ?>"><br>
-
-                <button type="submit" name="saveout" class="marginn">Save</button>
-            </form><br>
         </div>
-    <?php } ?>
-    </div>
-
-    <div>
-        <table>
-            <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Expense</th>
-                <th>Income</th>
-                <th>Balance</th>
-
-            </tr>
-            <!-- PHP CODE TO FETCH DATA FROM ROWS -->
-            <?php
-            // LOOP TILL END OF DATA
-            while ($rows_data = $result_data->fetch_assoc()) {
-                ?>
-                <tr>
-                    <!-- FETCHING DATA FROM EACH
-                    ROW OF EVERY COLUMN -->
-
-                    <td><?php echo $rows_data['date']; ?></td>
-                    <td><?php echo $rows_data['description']; ?></td>
-                    <td><?php echo $rows_data['category_name']; ?></td>
-                    <td><?php echo $rows_data['expense']; ?></td>
-                    <td><?php echo $rows_data['income']; ?></td>
-                    <td><?php echo $rows_data['balance']; ?></td>
-
-                </tr>
-                <?php
-            }
-            ?>
-        </table>
-    </div>
-
+    
 </body>
 
 </html>
